@@ -29,6 +29,9 @@ from pathlib import Path
 
 import pandas as pd
 
+import http.cookiejar
+import requests
+
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
     TranscriptsDisabled,
@@ -47,8 +50,8 @@ FAILED_CSV = "transcripts_failed.csv"
 BLOCKED_CSV = "transcripts_blocked.csv"
 
 # Conservative request rate. Don't be greedy on a residential IP.
-SLEEP_MIN = 4.0
-SLEEP_MAX = 8.0
+SLEEP_MIN = 4
+SLEEP_MAX = 8
 
 # Once your IP is flagged, sleeping won't unflag it. Abort and resume
 # later from a different network.
@@ -65,9 +68,21 @@ FAILED_FIELDS = ["video_id", "reason"]
 BLOCKED_FIELDS = ["video_id", "reason"]
 
 
-# Module-level singleton — the new API is instance-based.
-ytt_api = YouTubeTranscriptApi()
+def _build_session(cookie_path: str) -> requests.Session:
+    jar = http.cookiejar.MozillaCookieJar(cookie_path)
+    jar.load(ignore_discard=True, ignore_expires=True)
+    s = requests.Session()
+    s.cookies = jar
+    s.headers.update({
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+    })
+    return s
 
+ytt_api = YouTubeTranscriptApi(http_client=_build_session("cookies.txt"))
 
 def fetch_transcript(video_id):
     """
