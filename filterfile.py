@@ -20,9 +20,11 @@ print(both_ok["label_name"].value_counts().to_string())
 clickbait     = both_ok[both_ok["label"] == 1]
 non_clickbait = both_ok[both_ok["label"] == 0]
 
+# Target the smaller class size
 min_count = min(len(clickbait), len(non_clickbait))
 print(f"\nBalancing to {min_count} samples per class")
 
+# Downsample, concat, shuffle
 balanced = pd.concat([
     clickbait.sample(n=min_count, random_state=42),
     non_clickbait.sample(n=min_count, random_state=42),

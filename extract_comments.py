@@ -1,13 +1,3 @@
-"""
-Extract top-N comments per YouTube video for clickbait detection.
-
-Output: comments.csv (one row per comment, keyed on video_id)
-Schema is designed for downstream multilingual sentiment analysis (XLM-RoBERTa).
-
-Resume-safe: re-running skips video_ids already in comments.csv or comments_failed.csv.
-Quota-aware: rotates through API keys when one is exhausted.
-"""
-
 import csv
 import os
 import sys
@@ -46,6 +36,7 @@ COMMENT_FIELDS = [
 FAILED_FIELDS = ["video_id", "reason"]
 
 
+# Rotates API keys when one runs out of quota
 class KeyRotator:
     def __init__(self, keys):
         valid = [k for k in keys if k and not k.startswith("YOUR_KEY")]
@@ -58,6 +49,7 @@ class KeyRotator:
     def current(self):
         return self.keys[self.idx]
 
+    # Move to next live key, None if all dead
     def rotate(self):
         self.exhausted.add(self.idx)
         for _ in range(len(self.keys)):
@@ -75,6 +67,7 @@ def fetch_comments(youtube, video_id, max_comments, order):
     """Fetch up to max_comments top-level comments. May raise HttpError."""
     items = []
     page_token = None
+    # Page through commentThreads until full or no more pages
     while len(items) < max_comments:
         req = youtube.commentThreads().list(
             part="snippet",
@@ -85,6 +78,7 @@ def fetch_comments(youtube, video_id, max_comments, order):
             pageToken=page_token,
         )
         resp = req.execute()
+        # Flatten each thread into a row
         for entry in resp.get("items", []):
             top = entry["snippet"]["topLevelComment"]["snippet"]
             items.append({
@@ -157,6 +151,7 @@ def process_video(youtube, rotator, vid):
     return "fail", "max_retries", youtube
 
 
+# Resume helper: video_ids already in the CSV
 def load_done_set(path, col="video_id"):
     if not Path(path).exists():
         return set()
@@ -167,10 +162,12 @@ def main():
     rotator = KeyRotator(API_KEYS)
     youtube = build_client(rotator.current())
 
+    # Load input, keep only videos with comments confirmed available
     df = pd.read_csv(INPUT_CSV)
     df = df[df["comments_actually_available"] == True]
     all_ids = df["video_id"].tolist()
 
+    # Skip anything already processed
     done = load_done_set(OUTPUT_CSV)
     failed = load_done_set(FAILED_CSV)
     remaining = [v for v in all_ids if v not in done and v not in failed]
@@ -180,6 +177,7 @@ def main():
         print("Nothing to do.")
         return
 
+    # Open outputs in append mode, write header only if fresh
     new_out = not Path(OUTPUT_CSV).exists()
     new_fail = not Path(FAILED_CSV).exists()
     out_f = open(OUTPUT_CSV, "a", newline="", encoding="utf-8")
@@ -191,6 +189,7 @@ def main():
     if new_fail:
         fail_writer.writeheader()
 
+    # Ctrl-C: close cleanly
     def shutdown(*_):
         out_f.close(); fail_f.close()
         print("\nClean shutdown. Re-run to resume.")

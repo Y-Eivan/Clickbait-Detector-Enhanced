@@ -1,25 +1,3 @@
-"""
-Extract transcripts for YouTube videos. v2.
-
-Differences from v1:
-- youtube-transcript-api >= 1.0.0 (new instance-based API)
-- 429 / empty-body responses are now correctly classified as IP blocks
-  and trigger an ABORT, not a 10-min sleep that does nothing
-- Block-failures go to a separate `blocked.csv` file so they can be
-  retried later from a different IP, instead of being marked as
-  "no transcript available" forever
-- More conservative sleep band (4-8s)
-- Resume-safe across network changes
-
-Resume strategy:
-- transcripts.csv      → permanent: successfully fetched
-- transcripts_failed.csv → permanent: video genuinely has no transcript
-                          / disabled / unavailable
-- transcripts_blocked.csv → transient: IP was blocked. These are NOT
-                          treated as done — re-run from a new IP and
-                          they'll be picked up again.
-"""
-
 import csv
 import sys
 import time
@@ -68,6 +46,7 @@ FAILED_FIELDS = ["video_id", "reason"]
 BLOCKED_FIELDS = ["video_id", "reason"]
 
 
+# Browser-like session with cookies so YouTube doesn't flag us
 def _build_session(cookie_path: str) -> requests.Session:
     jar = http.cookiejar.MozillaCookieJar(cookie_path)
     jar.load(ignore_discard=True, ignore_expires=True)
@@ -96,10 +75,12 @@ def fetch_transcript(video_id):
     """
     transcript_list = ytt_api.list(video_id)
 
+    # Bucket tracks by manual vs auto-generated
     manual, generated = [], []
     for t in transcript_list:
         (generated if t.is_generated else manual).append(t)
 
+    # Prefer manual, fall back to generated
     chosen = manual[0] if manual else (generated[0] if generated else None)
     if chosen is None:
         return None
@@ -149,6 +130,7 @@ def is_block_error(exc):
 
 
 def main():
+    # Load input, keep only videos with transcripts confirmed available
     df = pd.read_csv(INPUT_CSV)
     df = df[df["transcript_actually_available"] == True]
     all_ids = df["video_id"].tolist()
@@ -164,6 +146,7 @@ def main():
         print("Nothing to do.")
         return
 
+    # Open all three CSVs, write headers only on fresh files
     new_out = not Path(OUTPUT_CSV).exists()
     new_fail = not Path(FAILED_CSV).exists()
     new_block = not Path(BLOCKED_CSV).exists()
@@ -234,6 +217,7 @@ def main():
                 print(f"[{i}/{len(remaining)}] {vid} BLOCKED "
                       f"(consec={consec_blocks}/{ABORT_AFTER_CONSECUTIVE_BLOCKS})")
 
+                # Too many blocks in a row, abort
                 if consec_blocks >= ABORT_AFTER_CONSECUTIVE_BLOCKS:
                     print(f"\n⚠ {consec_blocks} consecutive blocks. "
                           f"This IP is flagged. Aborting.\n"
