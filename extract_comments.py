@@ -9,7 +9,7 @@ import pandas as pd
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-# ============ CONFIG ============
+#CONFIG
 API_KEYS = [
     "AIzaSyCqJMOEtA5alkIbyXRqkp6tX8n4ZTZnQ9c",
     "AIzaSyBS08Jm7ksgU91zNlO_Q2T1drMGVP6frVw",
@@ -27,7 +27,6 @@ MAX_RETRIES = 3
 INITIAL_BACKOFF = 2.0
 MAX_BACKOFF = 60.0
 PROGRESS_EVERY = 1
-# ================================
 
 COMMENT_FIELDS = [
     "video_id", "comment_id", "text",
