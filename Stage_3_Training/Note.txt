@@ -1,0 +1,6 @@
+This section introduces a new thing  : GridSearchCV
+
+For Model 2 (Enhanced SVM) and Model 3 (Enhanced Random Forest), hyperparameters were selected via 5-fold cross-validated grid search on the training set, optimizing for F1 score. For Model 2, the search space was C ∈ {0.1, 1, 3.7, 10, 30} and γ ∈ {scale, auto, 0.01, 0.1, 1, 4.1}. For Model 3, the search space was n_estimators ∈ {100, 200, 500}, max_depth ∈ {None, 20, 50}, and min_samples_split ∈ {2, 5}. Vierti et al.'s reported hyperparameters were intentionally included in the SVM grid so that configuration remained reachable if optimal. The best estimator (by mean CV F1) was then refit on the full training set and evaluated once on the held-out test set. For Model 1, Vierti et al.'s reported hyperparameters (C=3.7, γ=4.1) were used directly, preserving the replication.
+
+
+GridSearchCV -> Technique to increase accuracy and tries every single possible combination in a manuall specified grid to find the best accuracy within the hyper-parameter
